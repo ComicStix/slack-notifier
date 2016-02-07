@@ -1,5 +1,4 @@
-
-m __future__ import print_function
+from __future__ import print_function
 import httplib2
 import os
 
@@ -18,7 +17,7 @@ except ImportError:
 
 SCOPES = 'https://www.googleapis.com/auth/calendar.readonly'
 CLIENT_SECRET_FILE = 'client_secret.json'
-APPLICATION_NAME = 'Google Calendar API Python Quickstart'
+APPLICATION_NAME = 'Slack Scheduler'
 
 
 def get_credentials():
@@ -49,6 +48,22 @@ def get_credentials():
         print('Storing credentials to ' + credential_path)
     return credentials
 
+def display_todays_events(service,now):
+    #Display the events for the current day, if they exist
+    today = datetime.date.today()
+    midnight = datetime.datetime.combine(today, datetime.time.max)
+    midnight = midnight.isoformat() + 'Z'
+    todaysResults = service.events().list(
+            calendarId='primary', timeMin=now, orderBy='startTime', singleEvents=True,
+            timeMax=midnight).execute()
+    todays_events = todaysResults.get('items',[])
+
+    if not todays_events:
+        print('No events scheduled for today')
+    for event in todays_events:
+        start = event['start'].get('dateTime', event['start'].get('date'))
+        print(start, event['summary'])
+        
 def main():
     """Shows basic usage of the Google Calendar API.
 
@@ -58,7 +73,6 @@ def main():
     credentials = get_credentials()
     http = credentials.authorize(httplib2.Http())
     service = discovery.build('calendar', 'v3', http=http)
-
     now = datetime.datetime.utcnow().isoformat() + 'Z' # 'Z' indicates UTC time
     print('Getting the upcoming 10 events')
     eventsResult = service.events().list(
@@ -71,7 +85,6 @@ def main():
     for event in events:
         start = event['start'].get('dateTime', event['start'].get('date'))
         print(start, event['summary'])
-
 
 if __name__ == '__main__':
     main()
