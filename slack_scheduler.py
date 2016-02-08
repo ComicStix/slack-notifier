@@ -65,7 +65,7 @@ def display_todays_events(service,now):
         print(start, event['summary'])
         
 def display_week_events(service, now):
-    #Display the events from the curent day until the end of the week(Sunday), if they exist
+    #Display the events from the current day until the end of the week (Sunday), if they exist
     today = datetime.datetime.today()
     weekday = today.isoweekday();
     this_sunday = today + datetime.timedelta(days= 7 - weekday)
@@ -82,6 +82,23 @@ def display_week_events(service, now):
         start = event['start'].get('dateTime', event['start'].get('date'))
         print(start, event['summary'])
         
+def display_months_events(service, now):
+    #Display the events from the current day until the end of the month, if they exist
+    today = datetime.datetime.today()
+    next_month = today.replace(day=28) + datetime.timedelta(days=4)
+    end_of_month = next_month - datetime.timedelta(days=next_month.day)
+    end_of_month = end_of_month.isoformat() + 'Z'
+    monthResults = service.events().list(
+            calendarId='primary', timeMin=now, orderBy='startTime', singleEvents=True,
+            timeMax=end_of_month).execute()
+    month_events =monthResults.get('items',[])
+
+    if not month_events:
+        print('No events scheduled for this month')
+    for event in month_events:
+        start = event['start'].get('dateTime', event['start'].get('date'))
+        print(start, event['summary'])
+
 def main():
     """Shows basic usage of the Google Calendar API.
 
