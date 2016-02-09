@@ -1,4 +1,5 @@
 from __future__ import print_function
+import dateutil.parser
 import httplib2
 import os
 
@@ -61,8 +62,16 @@ def display_todays_events(service,now):
     if not todays_events:
         print('No events scheduled for today')
     for event in todays_events:
-        start = event['start'].get('dateTime', event['start'].get('date'))
-        print(start, event['summary'])
+        print("Event: " + event['summary'])
+        start_date = dateutil.parser.parse(event['start'].get('dateTime'))
+        start_date = start_date.strftime("%A, %B %d %Y @ %I:%M %p")
+        print("Start: " + start_date)
+        end_date= dateutil.parser.parse(event['end'].get('dateTime'))
+        end_date = end_date.strftime("%A, %B %d %Y @ %I:%M %p")
+        print("End: " + end_date)
+        print("Location: " + event['location'])
+        print("Description: " + event['description'])
+        print("Link: " + event['htmlLink'])
         
 def display_week_events(service, now):
     #Display the events from the current day until the end of the week (Sunday), if they exist
@@ -79,8 +88,16 @@ def display_week_events(service, now):
     if not week_events:
         print('No events scheduled for this week')
     for event in week_events:
-        start = event['start'].get('dateTime', event['start'].get('date'))
-        print(start, event['summary'])
+        print("Event: " + event['summary'])
+        start_date = dateutil.parser.parse(event['start'].get('dateTime'))
+        start_date = start_date.strftime("%A, %B %d %Y @ %I:%M %p")
+        print("Start: " + start_date)
+        end_date= dateutil.parser.parse(event['end'].get('dateTime'))
+        end_date = end_date.strftime("%A, %B %d %Y @ %I:%M %p")
+        print("End: " + end_date)
+        print("Location: " + event['location'])
+        print("Description: " + event['description'])
+        print("Link: " + event['htmlLink'])
         
 def display_months_events(service, now):
     #Display the events from the current day until the end of the month, if they exist
@@ -96,8 +113,16 @@ def display_months_events(service, now):
     if not month_events:
         print('No events scheduled for this month')
     for event in month_events:
-        start = event['start'].get('dateTime', event['start'].get('date'))
-        print(start, event['summary'])
+        print("Event: " + event['summary'])
+        start_date = dateutil.parser.parse(event['start'].get('dateTime'))
+        start_date = start_date.strftime("%A, %B %d %Y @ %I:%M %p")
+        print("Start: " + start_date)
+        end_date= dateutil.parser.parse(event['end'].get('dateTime'))
+        end_date = end_date.strftime("%A, %B %d %Y @ %I:%M %p")
+        print("End: " + end_date)
+        print("Location: " + event['location'])
+        print("Description: " + event['description'])
+        print("Link: " + event['htmlLink'])
 
 def main():
     """Shows basic usage of the Google Calendar API.
@@ -109,7 +134,7 @@ def main():
     http = credentials.authorize(httplib2.Http())
     service = discovery.build('calendar', 'v3', http=http)
     now = datetime.datetime.utcnow().isoformat() + 'Z' # 'Z' indicates UTC time
-    print('Getting the upcoming 10 events')
+    """print('Getting the upcoming 10 events')
     eventsResult = service.events().list(
         calendarId='primary', timeMin=now, maxResults=10, singleEvents=True,
         orderBy='startTime').execute()
@@ -120,6 +145,6 @@ def main():
     for event in events:
         start = event['start'].get('dateTime', event['start'].get('date'))
         print(start, event['summary'])
-
+"""
 if __name__ == '__main__':
     main()
