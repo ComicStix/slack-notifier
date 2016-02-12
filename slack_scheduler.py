@@ -75,6 +75,7 @@ def display_todays_events(service,now,calendar):
         print("Location: " + event['location'])
         print("Description: " + event['description'])
         print("Link: " + event['htmlLink'])
+        print()
         
 def display_weeks_events(service, now, calendar):
     #Display the events from the current day until the end of the week (Sunday), if they exist
@@ -101,6 +102,7 @@ def display_weeks_events(service, now, calendar):
         print("Location: " + event['location'])
         print("Description: " + event['description'])
         print("Link: " + event['htmlLink'])
+        print()
         
 def display_months_events(service, now, calendar):
     #Display the events from the current day until the end of the month, if they exist
@@ -126,6 +128,7 @@ def display_months_events(service, now, calendar):
         print("Location: " + event['location'])
         print("Description: " + event['description'])
         print("Link: " + event['htmlLink'])
+        print()
 
 def main(argv):
     """Shows basic usage of the Google Calendar API.
@@ -152,6 +155,16 @@ def main(argv):
     calendar = args.calendar
     notificationTime = "00:00:00"
     
+    try:
+        cal = service.calendars().get(calendarId=calendar).execute()
+    except Exception as exc:
+        if exc.resp['status'] == '404':
+            print("Calendar %s not found" % calendar)
+        else:
+            print(exc.message)
+        sys.exit()
+
+
     if args.displayToday:
         display_todays_events(service,now,calendar)
     if args.displayWeek:
@@ -171,17 +184,5 @@ def main(argv):
         notificationTime = args.reminder
         print("Reminder set for",args.reminder)
 
-    """print('Getting the upcoming 10 events')
-    eventsResult = service.events().list(
-        calendarId='primary', timeMin=now, maxResults=10, singleEvents=True,
-        orderBy='startTime').execute()
-    events = eventsResult.get('items', [])
-
-    if not events:
-        print('No upcoming events found.')
-    for event in events:
-        start = event['start'].get('dateTime', event['start'].get('date'))
-        print(start, event['summary'])
-"""
 if __name__ == '__main__':
     main(sys.argv[1:])
