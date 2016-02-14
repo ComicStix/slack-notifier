@@ -1,4 +1,6 @@
 from __future__ import print_function
+import schedule
+import time
 import googleapiclient
 import argparse
 import sys,getopt
@@ -69,7 +71,7 @@ def display_todays_events(service,now,calendar):
         start_date = dateutil.parser.parse(event['start'].get('dateTime'))
         start_date = start_date.strftime("%A, %B %d %Y @ %I:%M %p")
         print("Start: " + start_date)
-        end_date= dateutil.parser.parse(event['end'].get('dateTime'))
+        end_date = dateutil.parser.parse(event['end'].get('dateTime'))
         end_date = end_date.strftime("%A, %B %d %Y @ %I:%M %p")
         print("End: " + end_date)
         print("Location: " + event['location'])
@@ -153,7 +155,7 @@ def main(argv):
     parser.add_argument("-r","--reminder",help="set time of Slack channel event notifications (if not set, notification time defaults to midnight)",type=str)
     args = parser.parse_args()
     calendar = args.calendar
-    notificationTime = "00:00:00"
+    notificationTime = "0:00"
     
     try:
         cal = service.calendars().get(calendarId=calendar).execute()
@@ -164,7 +166,9 @@ def main(argv):
             print(exc.message)
         sys.exit()
 
-
+    if args.reminder:
+        notificationTime = args.reminder
+        print("Reminder set for",args.reminder)
     if args.displayToday:
         display_todays_events(service,now,calendar)
     if args.displayWeek:
@@ -173,16 +177,19 @@ def main(argv):
         display_months_events(service,now,calendar)
     if args.daily:
         dailyReminder = True
+        schedule.every().day.at(notificationTime).do(display_todays_events, service, now,calendar)
         print("Daily reminder is on")
     if args.weekly:
         weeklyReminder = True
+        schedule.every().monday.at(notificationTime).do(display_weeks_events, service, now, calendar)
         print("Weekly reminder is on")
     if args.monthly:
         monthlyReminder = True
         print("Monthly reminder is on")
-    if args.reminder:
-        notificationTime = args.reminder
-        print("Reminder set for",args.reminder)
 
+    while True:
+        schedule.run_pending()
+        time.sleep(1)
+        
 if __name__ == '__main__':
     main(sys.argv[1:])
