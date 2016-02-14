@@ -188,6 +188,10 @@ def main(argv):
         print("Monthly reminder is on")
 
     while True:
+        today = datetime.datetime.now().replace(microsecond=0)
+        first_of_month = datetime.datetime(today.year, today.month, 1, 0, 0, 0)
+        if today == first_of_month & monthlyReminder == True:
+            display_months_events(service, now, calendar)
         schedule.run_pending()
         time.sleep(1)
         
