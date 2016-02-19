@@ -1,7 +1,7 @@
 from __future__ import print_function
+from slackclient import SlackClient
 import schedule
 import time
-import googleapiclient
 import argparse
 import sys,getopt
 import dateutil.parser
@@ -64,20 +64,7 @@ def display_todays_events(service,now,calendar):
             timeMax=midnight).execute()
     todays_events = todaysResults.get('items',[])
 
-    if not todays_events:
-        print('No events scheduled for today')
-    for event in todays_events:
-        print("Event: " + event['summary'])
-        start_date = dateutil.parser.parse(event['start'].get('dateTime'))
-        start_date = start_date.strftime("%A, %B %d %Y @ %I:%M %p")
-        print("Start: " + start_date)
-        end_date = dateutil.parser.parse(event['end'].get('dateTime'))
-        end_date = end_date.strftime("%A, %B %d %Y @ %I:%M %p")
-        print("End: " + end_date)
-        print("Location: " + event['location'])
-        print("Description: " + event['description'])
-        print("Link: " + event['htmlLink'])
-        print()
+    return todays_events
         
 def display_weeks_events(service, now, calendar):
     #Display the events from the current day until the end of the week (Sunday), if they exist
@@ -91,20 +78,7 @@ def display_weeks_events(service, now, calendar):
             timeMax=this_sunday).execute()
     week_events = weekResults.get('items',[])
 
-    if not week_events:
-        print('No events scheduled for this week')
-    for event in week_events:
-        print("Event: " + event['summary'])
-        start_date = dateutil.parser.parse(event['start'].get('dateTime'))
-        start_date = start_date.strftime("%A, %B %d %Y @ %I:%M %p")
-        print("Start: " + start_date)
-        end_date= dateutil.parser.parse(event['end'].get('dateTime'))
-        end_date = end_date.strftime("%A, %B %d %Y @ %I:%M %p")
-        print("End: " + end_date)
-        print("Location: " + event['location'])
-        print("Description: " + event['description'])
-        print("Link: " + event['htmlLink'])
-        print()
+    return week_events
         
 def display_months_events(service, now, calendar):
     #Display the events from the current day until the end of the month, if they exist
@@ -117,21 +91,24 @@ def display_months_events(service, now, calendar):
             timeMax=end_of_month).execute()
     month_events =monthResults.get('items',[])
 
-    if not month_events:
-        print('No events scheduled for this month')
-    for event in month_events:
-        print("Event: " + event['summary'])
+    return month_events
+
+def postNotification(token,channelID,events,timePeriod):
+    message = ""
+    sc = SlackClient(token)
+
+    if not events:
+        period = "*_No events scheduled for " + timePeriod + " :sleepy:  _*\n"
+    for event in events:
+        period = "*_Here are the events happening " + timePeriod + " :smile: _*\n"
         start_date = dateutil.parser.parse(event['start'].get('dateTime'))
         start_date = start_date.strftime("%A, %B %d %Y @ %I:%M %p")
-        print("Start: " + start_date)
-        end_date= dateutil.parser.parse(event['end'].get('dateTime'))
+        end_date = dateutil.parser.parse(event['end'].get('dateTime'))
         end_date = end_date.strftime("%A, %B %d %Y @ %I:%M %p")
-        print("End: " + end_date)
-        print("Location: " + event['location'])
-        print("Description: " + event['description'])
-        print("Link: " + event['htmlLink'])
-        print()
-
+        message += "\n - " + "*" + event['summary'] + "*" + "\n"+ start_date + " to " + end_date + "\n" + "*Where:* " + event['location'] + "\n" + "*Description:* " + event['description'] + "\n" + event['htmlLink'] + "\n"
+        
+    sc.api_call("chat.postMessage",username="Slack Notifier",channel=channelID,text=period + message)
+    
 def main(argv):
     """Shows basic usage of the Google Calendar API.
 
@@ -146,6 +123,8 @@ def main(argv):
 
     parser = argparse.ArgumentParser()
     parser.add_argument("calendar",help="input the calendar you would like to set notifications for",type=str)
+    parser.add_argument("token",help="input the token for your Slack team",type=str)
+    parser.add_argument("channelID",help="input the channel you would like the bot to post in",type=str)
     parser.add_argument("-d","--daily",help="set a daily reminder",action="store_true")
     parser.add_argument("-w","--weekly",help="set a weekly reminder",action="store_true")
     parser.add_argument("-m","--monthly",help="set a monthly reminder",action="store_true")
@@ -166,34 +145,38 @@ def main(argv):
             print(exc.message)
         sys.exit()
 
+    today = display_todays_events(service,now,calendar)
+    week = display_weeks_events(service,now,calendar)
+    month = display_months_events(service,now,calendar)
+
     if args.reminder:
         notificationTime = args.reminder
         print("Reminder set for",args.reminder)
     if args.displayToday:
-        display_todays_events(service,now,calendar)
+        postNotification(args.token,args.channelID,today,"today")
     if args.displayWeek:
-        display_weeks_events(service,now,calendar)
+        postNotification(args.token,args.channelID,week,"this week")
     if args.displayMonth:
-        display_months_events(service,now,calendar)
+        postNotification(args.token,args.channelID,month,"this month")
     if args.daily:
         dailyReminder = True
-        schedule.every().day.at(notificationTime).do(display_todays_events, service, now,calendar)
+        schedule.every().day.at(notificationTime).do(postNotification, args.token, args.channelID,today, "today")
         print("Daily reminder is on")
     if args.weekly:
         weeklyReminder = True
-        schedule.every().monday.at(notificationTime).do(display_weeks_events, service, now, calendar)
+        schedule.every().monday.at(notificationTime).do(postNotification, args.token, args.channelID, week, "this week")
         print("Weekly reminder is on")
     if args.monthly:
         monthlyReminder = True
         print("Monthly reminder is on")
 
-    while True:
-        today = datetime.datetime.now().replace(microsecond=0)
-        first_of_month = datetime.datetime(today.year, today.month, 1, 0, 0, 0)
-        if today == first_of_month & monthlyReminder == True:
-            display_months_events(service, now, calendar)
-        schedule.run_pending()
-        time.sleep(1)
+        while True:
+            today = datetime.datetime.now().replace(microsecond=0)
+            first_of_month = datetime.datetime(today.year, today.month, 1, 0, 0, 0)
+            if today == first_of_month:
+                postNotification(args.token,args.channelID,month,"this month")
+            schedule.run_pending()
+            time.sleep(1)
         
 if __name__ == '__main__':
     main(sys.argv[1:])
