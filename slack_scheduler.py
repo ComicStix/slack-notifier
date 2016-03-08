@@ -15,16 +15,9 @@ from oauth2client import tools
 
 import datetime
 
-"""try:
-    import argparse
-    flags = argparse.ArgumentParser(parents=[tools.argparser]).parse_args()
-except ImportError:
-    flags = None
-"""
 SCOPES = 'https://www.googleapis.com/auth/calendar.readonly'
 CLIENT_SECRET_FILE = 'client_secret.json'
 APPLICATION_NAME = 'Slack Scheduler'
-
 
 def get_credentials():
     """Gets valid user credentials from storage.
@@ -52,10 +45,12 @@ def get_credentials():
         else: # Needed only for compatibility with Python 2.6
             credentials = tools.run(flow, store)
         print('Storing credentials to ' + credential_path)
+
     return credentials
 
-def display_todays_events(service,now,calendar):
-    #Display the events for the current day, if they exist
+def get_todays_events(token, channelID, service, calendar):
+
+    now = datetime.datetime.utcnow().isoformat() + 'Z' # 'Z' indicates UTC time
     today = datetime.date.today()
     midnight = datetime.datetime.combine(today, datetime.time.max)
     midnight = midnight.isoformat() + 'Z'
@@ -64,10 +59,11 @@ def display_todays_events(service,now,calendar):
             timeMax=midnight).execute()
     todays_events = todaysResults.get('items',[])
 
-    return todays_events
+    postNotification(token, channelID, todays_events, "today")
         
-def display_weeks_events(service, now, calendar):
-    #Display the events from the current day until the end of the week (Sunday), if they exist
+def get_weeks_events(token, channelID, service, calendar):
+    
+    now = datetime.datetime.utcnow().isoformat() + 'Z' # 'Z' indicates UTC time
     today = datetime.datetime.today()
     weekday = today.isoweekday();
     this_sunday = today + datetime.timedelta(days= 7 - weekday)
@@ -76,12 +72,13 @@ def display_weeks_events(service, now, calendar):
     weekResults = service.events().list(
             calendarId=calendar, timeMin=now, orderBy='startTime', singleEvents=True,
             timeMax=this_sunday).execute()
-    week_events = weekResults.get('items',[])
+    weeks_events = weekResults.get('items',[])
 
-    return week_events
+    postNotification(token, channelID, weeks_events, "this week")
         
-def display_months_events(service, now, calendar):
-    #Display the events from the current day until the end of the month, if they exist
+def get_months_events(token, channelID, service, calendar):
+
+    now = datetime.datetime.utcnow().isoformat() + 'Z' # 'Z' indicates UTC time
     today = datetime.datetime.today()
     next_month = today.replace(day=28) + datetime.timedelta(days=4)
     end_of_month = next_month - datetime.timedelta(days=next_month.day)
@@ -89,11 +86,12 @@ def display_months_events(service, now, calendar):
     monthResults = service.events().list(
             calendarId=calendar, timeMin=now, orderBy='startTime', singleEvents=True,
             timeMax=end_of_month).execute()
-    month_events =monthResults.get('items',[])
+    months_events = monthResults.get('items',[])
+    
+    postNotification(token, channelID, months_events, "this month")
+    
+def postNotification(token, channelID, events, timePeriod):
 
-    return month_events
-
-def postNotification(token,channelID,events,timePeriod):
     message = ""
     sc = SlackClient(token)
 
@@ -110,16 +108,6 @@ def postNotification(token,channelID,events,timePeriod):
     sc.api_call("chat.postMessage",username="Slack Notifier",channel=channelID,text=period + message)
     
 def main(argv):
-    """Shows basic usage of the Google Calendar API.
-
-    Creates a Google Calendar API service object and outputs a list of the next
-    10 events on the user's calendar.
-    """
-    #Process command line arguments. Set default calendar to primary if not given
-    credentials = get_credentials()
-    http = credentials.authorize(httplib2.Http())
-    service = discovery.build('calendar', 'v3', http=http)
-    now = datetime.datetime.utcnow().isoformat() + 'Z' # 'Z' indicates UTC time
 
     parser = argparse.ArgumentParser()
     parser.add_argument("calendar",help="input the calendar you would like to set notifications for",type=str)
@@ -132,9 +120,13 @@ def main(argv):
     parser.add_argument("-dw","--displayWeek",help="display this week's events",action="store_true")
     parser.add_argument("-dm","--displayMonth",help="display this month's events",action="store_true")
     parser.add_argument("-r","--reminder",help="set time of Slack channel event notifications (if not set, notification time defaults to midnight)",type=str)
+    
     args = parser.parse_args()
     calendar = args.calendar
     notificationTime = "0:00"
+    credentials = get_credentials()
+    http = credentials.authorize(httplib2.Http())
+    service = discovery.build('calendar', 'v3', http=http)
     
     try:
         cal = service.calendars().get(calendarId=calendar).execute()
@@ -145,38 +137,32 @@ def main(argv):
             print(exc.message)
         sys.exit()
 
-    today = display_todays_events(service,now,calendar)
-    week = display_weeks_events(service,now,calendar)
-    month = display_months_events(service,now,calendar)
-
     if args.reminder:
         notificationTime = args.reminder
-        print("Reminder set for",args.reminder)
+        print("Reminder set for", args.reminder)
     if args.displayToday:
-        postNotification(args.token,args.channelID,today,"today")
+        get_todays_events(args.token, args.channelID, service, calendar)
     if args.displayWeek:
-        postNotification(args.token,args.channelID,week,"this week")
+        get_weeks_events(args.token, args.channelID, service, calendar)
     if args.displayMonth:
-        postNotification(args.token,args.channelID,month,"this month")
+        get_months_events(args.token, args.channelID, service, calendar)
     if args.daily:
-        dailyReminder = True
-        schedule.every().day.at(notificationTime).do(postNotification, args.token, args.channelID,today, "today")
+        schedule.every().day.at(notificationTime).do(get_todays_events, args.token, args.channelID, service, calendar)
         print("Daily reminder is on")
     if args.weekly:
-        weeklyReminder = True
-        schedule.every().monday.at(notificationTime).do(postNotification, args.token, args.channelID, week, "this week")
+        schedule.every().monday.at(notificationTime).do(get_weeks_events, args.token, args.channelID, service, calendar)
         print("Weekly reminder is on")
     if args.monthly:
-        monthlyReminder = True
         print("Monthly reminder is on")
 
-        while True:
+    while True:
+        if args.monthly:
             today = datetime.datetime.now().replace(microsecond=0)
             first_of_month = datetime.datetime(today.year, today.month, 1, 0, 0, 0)
             if today == first_of_month:
-                postNotification(args.token,args.channelID,month,"this month")
-            schedule.run_pending()
-            time.sleep(1)
+                get_months_events(args.token,args.channelID,service,calendar)
+        schedule.run_pending()
+        time.sleep(1)
         
 if __name__ == '__main__':
     main(sys.argv[1:])
