@@ -60,6 +60,7 @@ def get_todays_events(token, channelID, service, calendar):
     todays_events = todaysResults.get('items',[])
 
     return todays_events   
+
 def get_weeks_events(token, channelID, service, calendar):
     
     now = datetime.datetime.utcnow().isoformat() + 'Z' # 'Z' indicates UTC time
@@ -74,6 +75,7 @@ def get_weeks_events(token, channelID, service, calendar):
     weeks_events = weekResults.get('items',[])
 
     return weeks_events    
+
 def get_months_events(token, channelID, service, calendar):
 
     now = datetime.datetime.utcnow().isoformat() + 'Z' # 'Z' indicates UTC time
@@ -87,7 +89,8 @@ def get_months_events(token, channelID, service, calendar):
     months_events = monthResults.get('items',[])
     
     return months_events
-def postNotification(token, channelID, service, calendar, timePeriod, printInConsole):
+
+def postNotification(token, channelID, service, calendar, timePeriod):
 
     events = []
     message = ""
@@ -109,11 +112,33 @@ def postNotification(token, channelID, service, calendar, timePeriod, printInCon
         end_date = dateutil.parser.parse(event['end'].get('dateTime'))
         end_date = end_date.strftime("%A, %B %d %Y @ %I:%M %p")
         message += "\n - " + "*" + event['summary'] + "*" + "\n"+ start_date + " to " + end_date + "\n" + "*Where:* " + event['location'] + "\n" + "*Description:* " + event['description'] + "\n" + event['htmlLink'] + "\n"
-    
-    if printInConsole == True:
-        print(period + message)
-    else:
+        
         sc.api_call("chat.postMessage",username="Slack Notifier",channel=channelID,text=period + message)
+
+def printInConsole(token, channelID, service, calendar, timePeriod):
+
+    events = []
+    message = ""
+    sc = SlackClient(token)
+
+    if timePeriod == "today":
+        events = get_todays_events(token, channelID, service, calendar)
+    elif timePeriod == "this week":
+        events = get_weeks_events(token, channelID, service, calendar)
+    elif timePeriod == "this month":
+        events = get_months_events(token, channelID,service, calendar)
+
+    if not events:
+        period = "No events scheduled for " + timePeriod + ":\n"
+    for event in events:
+        period = "Here are the events happening " + timePeriod + "\n"
+        start_date = dateutil.parser.parse(event['start'].get('dateTime'))
+        start_date = start_date.strftime("%A, %B %d %Y @ %I:%M %p")
+        end_date = dateutil.parser.parse(event['end'].get('dateTime'))
+        end_date = end_date.strftime("%A, %B %d %Y @ %I:%M %p")
+        message += "\n - "+ event['summary'] + "\n"+ start_date + " to " + end_date + "\n" + "Where: " + event['location'] + "\n" + "Description: " + event['description'] + "\n" + event['htmlLink'] + "\n"
+    
+    print(period + message)
 
 def main(argv):
 
@@ -130,13 +155,16 @@ def main(argv):
     parser.add_argument("-r","--reminder",help="set time of Slack channel event notifications (if not set, notification time defaults to midnight)",type=str)
     
     args = parser.parse_args()
-    calendar = args.calendar
+   
+   #set the default notification time to midnight if no notification time is entered
     notificationTime = "0:00"
     credentials = get_credentials()
     http = credentials.authorize(httplib2.Http())
     service = discovery.build('calendar', 'v3', http=http)
-    
+
+   #check to see if the calendar is exists and/or the user has permission to access
     try:
+        calendar = args.calendar
         cal = service.calendars().get(calendarId=calendar).execute()
     except Exception as exc:
         if exc.resp['status'] == '404':
@@ -144,31 +172,34 @@ def main(argv):
         else:
             print(exc.message)
         sys.exit()
-
+   
+    
     if args.reminder:
         notificationTime = args.reminder
         print("Reminder set for", args.reminder)
     if args.displayToday:
-        postNotification(args.token, args.channelID, service, calendar, "today", True)
+        printInConsole(args.token, args.channelID, service, calendar, "today")
     if args.displayWeek:
-        postNotification(args.token, args.channelID, service, calendar, "this week", True)
+        printInConsole(args.token, args.channelID, service, calendar, "this week")
     if args.displayMonth:
-        postNotification(args.token, args.channelID, service, calendar, "this month", True)
+        printInConsole(args.token, args.channelID, service, calendar, "this month")
     if args.daily:
-        schedule.every().day.at(notificationTime).do(postNotification, args.token, args.channelID, service, calendar, "daily", False)
+        schedule.every().day.at(notificationTime).do(postNotification, args.token, args.channelID, service, calendar, "today")
         print("Daily reminder is on")
     if args.weekly:
-        schedule.every().monday.at(notificationTime).do(postNotification, args.token, args.channelID, service, calendar,"this week", False)
+        schedule.every().monday.at(notificationTime).do(postNotification, args.token, args.channelID, service, calendar,"this week")
         print("Weekly reminder is on")
     if args.monthly:
         print("Monthly reminder is on")
+   
+   #infinite loops runs continuously to ensure daily, weekly, and monthly alerts work
     if args.daily | args.weekly | args.monthly:
         while True:
             if args.monthly:
                 today = datetime.datetime.now().replace(microsecond=0)
                 first_of_month = datetime.datetime(today.year, today.month, 1, 0, 0, 0)
                 if today == first_of_month:
-                    postNotification(args.token, args.channelID, service, calendar, "this month", False)
+                    postNotification(args.token, args.channelID, service, calendar, "this month")
             schedule.run_pending()
             time.sleep(1)
         
