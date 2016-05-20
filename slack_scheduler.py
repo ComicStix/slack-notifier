@@ -1,4 +1,5 @@
 from __future__ import print_function
+import pytz
 from slackclient import SlackClient
 import schedule
 import time
@@ -12,7 +13,6 @@ from apiclient import discovery
 import oauth2client
 from oauth2client import client
 from oauth2client import tools
-
 import datetime
 
 SCOPES = 'https://www.googleapis.com/auth/calendar.readonly'
@@ -49,11 +49,14 @@ def get_credentials():
     return credentials
 
 def get_todays_events(token, channelID, service, calendar):
-
-    now = datetime.datetime.utcnow().isoformat() + 'Z' # 'Z' indicates UTC time
+    #now = datetime.datetime.now(datetime.datetime.timezone.utc).astimezone().isoformat() + 'Z' # 'Z' indicates UTC time
+    eastern = pytz.timezone('America/New_York')
+    now = datetime.datetime.now(eastern).isoformat()
     today = datetime.date.today()
     midnight = datetime.datetime.combine(today, datetime.time.max)
-    midnight = midnight.isoformat() + 'Z'
+    midnight = midnight.replace(tzinfo=pytz.timezone('America/New_York'))
+    midnight = midnight.isoformat()
+    
     todaysResults = service.events().list(
             calendarId=calendar, timeMin=now, orderBy='startTime', singleEvents=True,
             timeMax=midnight).execute()
@@ -63,7 +66,10 @@ def get_todays_events(token, channelID, service, calendar):
 
 def get_weeks_events(token, channelID, service, calendar):
     
-    now = datetime.datetime.utcnow().isoformat() + 'Z' # 'Z' indicates UTC time
+    eastern = pytz.timezone('America/New_York')
+    now = datetime.datetime.now(eastern).isoformat()
+    
+    print(now)
     today = datetime.datetime.today()
     weekday = today.isoweekday();
     this_sunday = today + datetime.timedelta(days= 7 - weekday)
@@ -78,7 +84,10 @@ def get_weeks_events(token, channelID, service, calendar):
 
 def get_months_events(token, channelID, service, calendar):
 
-    now = datetime.datetime.utcnow().isoformat() + 'Z' # 'Z' indicates UTC time
+    eastern = pytz.timezone('America/New_York')
+    now = datetime.datetime.now(eastern).isoformat()
+    today = datetime.datetime.today()
+    print(now)
     today = datetime.datetime.today()
     next_month = today.replace(day=28) + datetime.timedelta(days=4)
     end_of_month = next_month - datetime.timedelta(days=next_month.day)
@@ -106,14 +115,14 @@ def postNotification(token, channelID, service, calendar, timePeriod):
     if not events:
         period = "*_No events scheduled for " + timePeriod + " :sleepy:  _*\n"
     for event in events:
-        period = "*_Here are the events happening " + timePeriod + " :smile: _*\n"
+        period = "*_Here are the events happening " + timePeriod + "  :smile: _*\n"
         start_date = dateutil.parser.parse(event['start'].get('dateTime'))
         start_date = start_date.strftime("%A, %B %d %Y @ %I:%M %p")
         end_date = dateutil.parser.parse(event['end'].get('dateTime'))
         end_date = end_date.strftime("%A, %B %d %Y @ %I:%M %p")
         message += "\n - " + "*" + event['summary'] + "*" + "\n"+ start_date + " to " + end_date + "\n" + "*Where:* " + event['location'] + "\n" + "*Description:* " + event['description'] + "\n" + event['htmlLink'] + "\n"
         
-        sc.api_call("chat.postMessage",username="Slack Notifier",channel=channelID,text=period + message)
+    sc.api_call("chat.postMessage",username="Slack Notifier",channel=channelID,text=period + message)
 
 def printInConsole(token, channelID, service, calendar, timePeriod):
 
@@ -129,10 +138,11 @@ def printInConsole(token, channelID, service, calendar, timePeriod):
         events = get_months_events(token, channelID,service, calendar)
 
     if not events:
-        period = "No events scheduled for " + timePeriod + ":\n"
+        period = "No events scheduled for " + timePeriod + "\n"
     for event in events:
         period = "Here are the events happening " + timePeriod + "\n"
         start_date = dateutil.parser.parse(event['start'].get('dateTime'))
+        print(event['start'])
         start_date = start_date.strftime("%A, %B %d %Y @ %I:%M %p")
         end_date = dateutil.parser.parse(event['end'].get('dateTime'))
         end_date = end_date.strftime("%A, %B %d %Y @ %I:%M %p")
@@ -173,7 +183,6 @@ def main(argv):
             print(exc.message)
         sys.exit()
    
-    
     if args.reminder:
         notificationTime = args.reminder
         print("Reminder set for", args.reminder)
