@@ -49,7 +49,7 @@ def get_credentials():
     return credentials
 
 def get_todays_events(token, channelID, service, calendar):
-    #now = datetime.datetime.now(datetime.datetime.timezone.utc).astimezone().isoformat() + 'Z' # 'Z' indicates UTC time
+
     eastern = pytz.timezone('America/New_York')
     now = datetime.datetime.now(eastern).isoformat()
     today = datetime.date.today()
@@ -68,8 +68,6 @@ def get_weeks_events(token, channelID, service, calendar):
     
     eastern = pytz.timezone('America/New_York')
     now = datetime.datetime.now(eastern).isoformat()
-    
-    print(now)
     today = datetime.datetime.today()
     weekday = today.isoweekday();
     this_sunday = today + datetime.timedelta(days= 7 - weekday)
@@ -86,8 +84,6 @@ def get_months_events(token, channelID, service, calendar):
 
     eastern = pytz.timezone('America/New_York')
     now = datetime.datetime.now(eastern).isoformat()
-    today = datetime.datetime.today()
-    print(now)
     today = datetime.datetime.today()
     next_month = today.replace(day=28) + datetime.timedelta(days=4)
     end_of_month = next_month - datetime.timedelta(days=next_month.day)
@@ -142,7 +138,6 @@ def printInConsole(token, channelID, service, calendar, timePeriod):
     for event in events:
         period = "Here are the events happening " + timePeriod + "\n"
         start_date = dateutil.parser.parse(event['start'].get('dateTime'))
-        print(event['start'])
         start_date = start_date.strftime("%A, %B %d %Y @ %I:%M %p")
         end_date = dateutil.parser.parse(event['end'].get('dateTime'))
         end_date = end_date.strftime("%A, %B %d %Y @ %I:%M %p")
