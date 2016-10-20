@@ -112,11 +112,13 @@ def postNotification(token, channelID, service, calendar, timePeriod):
         period = "*_No events scheduled for " + timePeriod + " :sleepy:  _*\n"
     for event in events:
         period = "*_Here are the events happening " + timePeriod + "  :smile: _*\n"
+        period = period.encode('utf-8')
         start_date = dateutil.parser.parse(event['start'].get('dateTime'))
         start_date = start_date.strftime("%A, %B %d %Y @ %I:%M %p")
         end_date = dateutil.parser.parse(event['end'].get('dateTime'))
         end_date = end_date.strftime("%A, %B %d %Y @ %I:%M %p")
         message += "\n - " + "*" + event['summary'] + "*" + "\n"+ start_date + " to " + end_date + "\n" + "*Where:* " + event['location'] + "\n" + "*Description:* " + event['description'] + "\n" + event['htmlLink'] + "\n"
+        message = message.encode('utf-8')
         
     sc.api_call("chat.postMessage",username="Slack Notifier",channel=channelID,text=period + message)
 
